@@ -1,0 +1,297 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  PLATFORM_ADMIN
+  REGIONAL_SUPERVISOR
+  SCHOOL_ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum SchoolType {
+  PRIMARY
+  SECONDARY
+  UNIVERSITY
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  INACTIVE
+  TRANSFERRED
+  GRADUATED
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ─────────────────────────────────────────────────────────────
+// Platform-level tables (no tenant_id, no RLS)
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id         String   @id @default(uuid())
+  externalId String   @unique
+  email      String   @unique
+  name       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  memberships   TenantMembership[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model Region {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenants               Tenant[]
+  supervisorAssignments SupervisorRegionAssignment[]
+
+  @@map("regions")
+}
+
+model Tenant {
+  id               String           @id @default(uuid())
+  name             String
+  slug             String           @unique
+  type             SchoolType
+  subscriptionTier SubscriptionTier @default(FREE)
+  isActive         Boolean          @default(true)
+  regionId         String
+  adminEmail       String?
+  logoUrl          String?
+  phone            String?
+  address          String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  region      Region             @relation(fields: [regionId], references: [id])
+  memberships TenantMembership[]
+
+  @@map("tenants")
+}
+
+model TenantMembership {
+  id        String   @id @default(uuid())
+  userId    String
+  tenantId  String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  user   User   @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([userId, tenantId])
+  @@map("tenant_memberships")
+}
+
+model SupervisorRegionAssignment {
+  id       String @id @default(uuid())
+  userId   String
+  regionId String
+
+  createdAt DateTime @default(now())
+
+  region Region @relation(fields: [regionId], references: [id])
+
+  @@unique([userId, regionId])
+  @@map("supervisor_region_assignments")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  tenantId  String?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("refresh_tokens")
+}
+
+// Phase 2
+model ParentStudentLink {
+  id               String   @id @default(uuid())
+  parentUserId     String
+  studentId        String
+  relationshipType String
+  createdAt        DateTime @default(now())
+
+  @@map("parent_student_links")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Tenant-scoped tables (all have tenant_id, covered by RLS)
+// ─────────────────────────────────────────────────────────────
+
+model Student {
+  id               String           @id @default(uuid())
+  tenantId         String
+  nationalId       String           @unique
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime?
+  userId           String?
+  enrollmentStatus EnrollmentStatus @default(ACTIVE)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  enrollments ClassEnrollment[]
+
+  @@map("students")
+}
+
+model AcademicYear {
+  id        String    @id @default(uuid())
+  tenantId  String
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  isCurrent Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  terms Term[]
+
+  @@map("academic_years")
+}
+
+model Term {
+  id             String    @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  name           String
+  startDate      DateTime
+  endDate        DateTime
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  classes      Class[]
+
+  @@map("terms")
+}
+
+model Room {
+  id        String    @id @default(uuid())
+  tenantId  String
+  name      String
+  capacity  Int?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  classes Class[]
+
+  @@map("rooms")
+}
+
+model Class {
+  id        String    @id @default(uuid())
+  tenantId  String
+  termId    String
+  teacherId String?
+  roomId    String?
+  name      String
+  subject   String?
+  schedule  Json?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  term        Term            @relation(fields: [termId], references: [id])
+  room        Room?           @relation(fields: [roomId], references: [id])
+  enrollments ClassEnrollment[]
+
+  @@map("classes")
+}
+
+model ClassEnrollment {
+  id        String    @id @default(uuid())
+  tenantId  String
+  studentId String
+  classId   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  student Student @relation(fields: [studentId], references: [id])
+  class   Class   @relation(fields: [classId], references: [id])
+
+  @@unique([studentId, classId])
+  @@map("class_enrollments")
+}
+
+model StaffProfile {
+  id        String    @id @default(uuid())
+  tenantId  String
+  userId    String
+  bio       String?
+  subjects  String[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("staff_profiles")
+}
+
+model TransferRequest {
+  id                String         @id @default(uuid())
+  tenantId          String
+  fromTenantId      String
+  toTenantId        String
+  studentNationalId String
+  status            TransferStatus @default(PENDING)
+  historySnapshot   Json?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@map("transfer_requests")
+}
+
+model SchoolAnnouncement {
+  id        String    @id @default(uuid())
+  tenantId  String
+  title     String
+  content   String
+  isPublic  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("school_announcements")
+}
