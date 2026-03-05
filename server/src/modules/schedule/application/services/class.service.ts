@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { SubscriptionTier } from '@common/enums/subscription-tier.enum';
+
 import { PrismaService } from '@modules/prisma/prisma.service';
 
 import type { Prisma } from '@prisma/client';
@@ -65,8 +67,12 @@ export class ClassService {
     return cls;
   }
 
-  async create(tenantId: string, dto: CreateClassDto) {
-    const conflicts = await this.detectConflicts(tenantId, dto);
+  async create(
+    tenantId: string,
+    dto: CreateClassDto,
+    subscriptionTier: SubscriptionTier,
+  ) {
+    const conflicts = await this.detectConflicts(tenantId, dto, undefined, subscriptionTier);
 
     return this.prisma.withTenant(tenantId, (tx) =>
       tx.class.create({
@@ -84,10 +90,15 @@ export class ClassService {
     ).then((cls) => ({ ...cls, conflicts }));
   }
 
-  async update(tenantId: string, id: string, dto: UpdateClassDto) {
+  async update(
+    tenantId: string,
+    id: string,
+    dto: UpdateClassDto,
+    subscriptionTier: SubscriptionTier,
+  ) {
     await this.findOne(tenantId, id);
 
-    const conflicts = await this.detectConflicts(tenantId, dto, id);
+    const conflicts = await this.detectConflicts(tenantId, dto, id, subscriptionTier);
 
     return this.prisma.withTenant(tenantId, (tx) =>
       tx.class.update({
@@ -122,7 +133,13 @@ export class ClassService {
     tenantId: string,
     dto: CreateClassDto | UpdateClassDto,
     excludeClassId?: string,
+    subscriptionTier: SubscriptionTier = SubscriptionTier.FREE,
   ): Promise<string[]> {
+    const tierRank = { FREE: 0, PRO: 1, ENTERPRISE: 2 };
+    if (tierRank[subscriptionTier] < tierRank[SubscriptionTier.PRO]) {
+      return [];
+    }
+
     if (!dto.schedule?.length || (!dto.teacherId && !dto.roomId)) {
       return [];
     }

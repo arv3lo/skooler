@@ -14,6 +14,7 @@ import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 
 import { Roles } from '@common/decorators/roles.decorator';
 import { Role } from '@common/enums/role.enum';
+import { SubscriptionTier } from '@common/enums/subscription-tier.enum';
 import { RolesGuard } from '@common/guards/roles.guard';
 import type { AuthenticatedRequest } from '@common/interfaces/authenticated-request.interface';
 import { ClassService } from '@modules/schedule/application/services/class.service';
@@ -50,7 +51,11 @@ export class ClassController {
     summary: 'Create a class — returns conflict warnings if any',
   })
   create(@Req() req: AuthenticatedRequest, @Body() dto: CreateClassDto) {
-    return this.classService.create(req.tenantId!, dto);
+    return this.classService.create(
+      req.tenantId!,
+      dto,
+      req.user.subscriptionTier ?? SubscriptionTier.FREE,
+    );
   }
 
   @Patch(':id')
@@ -61,7 +66,12 @@ export class ClassController {
     @Param('id') id: string,
     @Body() dto: UpdateClassDto,
   ) {
-    return this.classService.update(req.tenantId!, id, dto);
+    return this.classService.update(
+      req.tenantId!,
+      id,
+      dto,
+      req.user.subscriptionTier ?? SubscriptionTier.FREE,
+    );
   }
 
   @Delete(':id')
