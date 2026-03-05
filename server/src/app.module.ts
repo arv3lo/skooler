@@ -9,6 +9,7 @@ import { TenantMiddleware } from '@common/middleware/tenant.middleware';
 import { AuthModule } from '@modules/auth/auth.module';
 import { EnrollmentModule } from '@modules/enrollment/enrollment.module';
 import { ScheduleModule } from '@modules/schedule/schedule.module';
+import { PublicModule } from '@modules/public/public.module';
 import { StaffModule } from '@modules/staff/staff.module';
 import { PlatformModule } from '@modules/platform/platform.module';
 import { PrismaModule } from '@modules/prisma/prisma.module';
@@ -25,6 +26,7 @@ import { UserModule } from '@modules/user/user.module';
     EnrollmentModule,
     ScheduleModule,
     StaffModule,
+    PublicModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
