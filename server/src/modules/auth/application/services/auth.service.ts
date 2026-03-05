@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'crypto';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 import { Role } from '@common/enums/role.enum';
 import { SubscriptionTier } from '@common/enums/subscription-tier.enum';
@@ -179,21 +180,34 @@ export class AuthService {
   private async validateExternalToken(
     token: string,
   ): Promise<ExternalTokenPayload> {
-    // TODO: validate against JWKS from AUTH_PROVIDER_JWKS_URI
-    // For now, decode without full verification (development only)
-    try {
-      const [, payloadB64] = token.split('.');
-      const decoded = JSON.parse(
-        Buffer.from(payloadB64, 'base64url').toString(),
-      ) as ExternalTokenPayload;
+    const jwksUri = this.config.getOrThrow<string>('AUTH_PROVIDER_JWKS_URI');
+    const issuer = this.config.getOrThrow<string>('AUTH_PROVIDER_DOMAIN');
+    const audience = this.config.getOrThrow<string>('AUTH_PROVIDER_AUDIENCE');
 
-      if (!decoded.sub || !decoded.email) {
-        throw new Error('Missing required claims');
+    try {
+      const JWKS = createRemoteJWKSet(new URL(jwksUri));
+
+      const { payload } = await jwtVerify(token, JWKS, {
+        issuer,
+        audience,
+      });
+
+      const sub = payload.sub;
+      const email = payload['email'] as string | undefined;
+
+      if (!sub || !email) {
+        throw new Error('Missing required claims: sub, email');
       }
 
-      return decoded;
-    } catch {
-      throw new UnauthorizedException('Invalid external token');
+      return {
+        sub,
+        email,
+        name: payload['name'] as string | undefined,
+      };
+    } catch (err) {
+      throw new UnauthorizedException(
+        `Invalid external token: ${(err as Error).message}`,
+      );
     }
   }
 
