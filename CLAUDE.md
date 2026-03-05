@@ -12,6 +12,7 @@
 - For every entry in .env file, add an example entry in .env.example file
 - Always leave heavy tasks to the server, client should only be used for data entry and data display
 - If a server-side function can be run in the database (as triggers or functions), do it
+- Always git pull develop branch and checkout a new branch from it
 - Use micro-commits
 
 # Tools
