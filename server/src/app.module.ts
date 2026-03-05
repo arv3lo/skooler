@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
 import { TenantGuard } from '@common/guards/tenant.guard';
 import { TenantMiddleware } from '@common/middleware/tenant.middleware';
 import { AuthModule } from '@modules/auth/auth.module';
+import { EnrollmentModule } from '@modules/enrollment/enrollment.module';
 import { PlatformModule } from '@modules/platform/platform.module';
 import { PrismaModule } from '@modules/prisma/prisma.module';
 import { UserModule } from '@modules/user/user.module';
@@ -19,6 +20,7 @@ import { UserModule } from '@modules/user/user.module';
     AuthModule,
     PlatformModule,
     UserModule,
+    EnrollmentModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
